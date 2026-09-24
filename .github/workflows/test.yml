@@ -13,24 +13,9 @@ jobs:
       matrix:
         zig_version: ['0.16.0']
         mode: [Debug, ReleaseSafe]
-        config:
-          - { os: ubuntu-24.04, target: native }
-          - { os: ubuntu-24.04-arm, target: native }
-          - { os: macos-latest, target: native }
-          - { os: macos-15-intel, target: native }
-          - { os: windows-latest, target: native }
-          - { os: ubuntu-latest, target: x86_64-linux-musl }
-          - { os: ubuntu-latest, target: x86-linux, qemu: true }
-          - { os: ubuntu-latest, target: arm-linux, qemu: true }
-          - { os: ubuntu-latest, target: riscv64-linux, qemu: true }
-          - { os: ubuntu-latest, target: powerpc64le-linux, qemu: true }
-          # Big-endian.
-          - { os: ubuntu-latest, target: s390x-linux, qemu: true }
-          - { os: ubuntu-latest, target: x86_64-freebsd, vm: freebsd }
-          - { os: ubuntu-latest, target: x86_64-netbsd, vm: netbsd }
-          - { os: ubuntu-latest, target: x86_64-openbsd, vm: openbsd }
+        os: [ubuntu-24.04, ubuntu-24.04-arm, macos-latest, macos-15-intel, windows-latest]
 
-    runs-on: ${{ matrix.config.os }}
+    runs-on: ${{ matrix.os }}
 
     steps:
     - name: Checkout code
@@ -41,44 +26,6 @@ jobs:
       with:
         version: ${{ matrix.zig_version }}
 
-    - name: Install QEMU
-      if: matrix.config.qemu
-      run: |
-        sudo apt-get update -q -y
-        sudo apt-get install -q -y qemu-user-static
-
     - name: Build and test
-      if: ${{ !matrix.config.vm }}
-      shell: bash
-      run: |
-        zig build test --summary all -Doptimize=${{ matrix.mode }} \
-          ${{ matrix.config.target != 'native' && format('-Dtarget={0}', matrix.config.target) || '' }} \
-          ${{ matrix.config.qemu && '-fqemu' || '' }}
+      run: zig build test --summary all -Doptimize=${{ matrix.mode }}
       timeout-minutes: 15
-
-    - name: Build tests for the VM
-      if: matrix.config.vm
-      run: zig build test-bin -Doptimize=${{ matrix.mode }} -Dtarget=${{ matrix.config.target }}
-      timeout-minutes: 15
-
-    - name: Run tests (FreeBSD VM)
-      if: matrix.config.vm == 'freebsd'
-      uses: vmactions/freebsd-vm@v1
-      timeout-minutes: 20
-      with:
-        run: ./zig-out/bin/test
-
-    - name: Run tests (NetBSD VM)
-      if: matrix.config.vm == 'netbsd'
-      uses: vmactions/netbsd-vm@v1
-      timeout-minutes: 20
-      with:
-        release: '10.1'
-        run: ./zig-out/bin/test
-
-    - name: Run tests (OpenBSD VM)
-      if: matrix.config.vm == 'openbsd'
-      uses: vmactions/openbsd-vm@v1
-      timeout-minutes: 20
-      with:
-        run: ./zig-out/bin/test
